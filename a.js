@@ -1,192 +1,269 @@
-var chartData = [];
-generateChartData();
 
+var dom = document.getElementById("container");
+var myChart = echarts.init(dom);
+var app = {};
+option = null;
+var upColor = '#00da3c';
+var downColor = '#ec0000';
 
-function generateChartData() {
-  var firstDate = new Date();
-  firstDate.setHours( 0, 0, 0, 0 );
-  firstDate.setDate( firstDate.getDate() - 2000 );
-
-  for ( var i = 0; i < 2000; i++ ) {
-    var newDate = new Date( firstDate );
-
-    newDate.setDate( newDate.getDate() + i );
-
-    var open = Math.round( Math.random() * ( 30 ) + 100 );
-    var close = open + Math.round( Math.random() * ( 15 ) - Math.random() * 10 );
-
-    var low;
-    if ( open < close ) {
-      low = open - Math.round( Math.random() * 5 );
-    } else {
-      low = close - Math.round( Math.random() * 5 );
+function splitData(rawData) {
+    var categoryData = [];
+    var values = [];
+    var volumes = [];
+    for (var i = 0; i < rawData.length; i++) {
+        categoryData.push(rawData[i].splice(0, 1)[0]);
+        values.push(rawData[i]);
+        volumes.push([i, rawData[i][4], rawData[i][0] > rawData[i][1] ? 1 : -1]);
     }
 
-    var high;
-    if ( open < close ) {
-      high = close + Math.round( Math.random() * 5 );
-    } else {
-      high = open + Math.round( Math.random() * 5 );
-    }
-
-    var volume = Math.round( Math.random() * ( 1000 + i ) ) + 100 + i;
-    var value = Math.round( Math.random() * ( 30 ) + 100 );
-
-    chartData[ i ] = ( {
-      "date": newDate,
-      "open": open,
-      "close": close,
-      "high": high,
-      "low": low,
-      "volume": volume,
-      "value": value
-    } );
-  }
+    return {
+        categoryData: categoryData,
+        values: values,
+        volumes: volumes
+    };
 }
 
-var chart = AmCharts.makeChart( "chartdiv", {
-  "type": "stock",
-  "theme": "light",
-  "dataSets": [ {
-    "fieldMappings": [ {
-      "fromField": "open",
-      "toField": "open"
-    }, {
-      "fromField": "close",
-      "toField": "close"
-    }, {
-      "fromField": "high",
-      "toField": "high"
-    }, {
-      "fromField": "low",
-      "toField": "low"
-    }, {
-      "fromField": "volume",
-      "toField": "volume"
-    }, {
-      "fromField": "value",
-      "toField": "value"
-    } ],
-    "color": "#7f8da9",
-    "dataProvider": chartData,
-    "title": "West Stock",
-    "categoryField": "date"
-  }, {
-    "fieldMappings": [ {
-      "fromField": "value",
-      "toField": "value"
-    } ],
-    "color": "#fac314",
-    "dataProvider": chartData,
-    "compared": true,
-    "title": "East Stock",
-    "categoryField": "date"
-  } ],
-
-
-  "panels": [ {
-      "title": "Value",
-      "showCategoryAxis": false,
-      "percentHeight": 70,
-      "valueAxes": [ {
-        "id": "v1",
-        "dashLength": 5
-      } ],
-
-      "categoryAxis": {
-        "dashLength": 5
-      },
-
-      "stockGraphs": [ {
-        "type": "candlestick",
-        "id": "g1",
-        "openField": "open",
-        "closeField": "close",
-        "highField": "high",
-        "lowField": "low",
-        "valueField": "close",
-        "lineColor": "#7f8da9",
-        "fillColors": "#7f8da9",
-        "negativeLineColor": "#db4c3c",
-        "negativeFillColors": "#db4c3c",
-        "fillAlphas": 1,
-        "useDataSetColors": false,
-        "comparable": true,
-        "compareField": "value",
-        "showBalloon": false,
-        "proCandlesticks": true
-      } ],
-
-      "stockLegend": {
-        "valueTextRegular": undefined,
-        "periodValueTextComparing": "[[percents.value.close]]%"
-      }
-    },
-
-    {
-      "title": "Volume",
-      "percentHeight": 30,
-      "marginTop": 1,
-      "showCategoryAxis": true,
-      "valueAxes": [ {
-        "dashLength": 5
-      } ],
-
-      "categoryAxis": {
-        "dashLength": 5
-      },
-
-      "stockGraphs": [ {
-        "valueField": "volume",
-        "type": "column",
-        "showBalloon": false,
-        "fillAlphas": 1
-      } ],
-
-      "stockLegend": {
-        "markerType": "none",
-        "markerSize": 0,
-        "labelText": "",
-        "periodValueTextRegular": "[[value.close]]"
-      }
+function calculateMA(dayCount, data) {
+    var result = [];
+    for (var i = 0, len = data.values.length; i < len; i++) {
+        if (i < dayCount) {
+            result.push('-');
+            continue;
+        }
+        var sum = 0;
+        for (var j = 0; j < dayCount; j++) {
+            sum += data.values[i - j][1];
+        }
+        result.push(+(sum / dayCount).toFixed(3));
     }
-  ],
+    return result;
+}
 
-  "chartScrollbarSettings": {
-    "graph": "g1",
-    "graphType": "line",
-    "usePeriod": "WW"
-  },
+$.get('abc.json', function (rawData) {
+   
+    var data = splitData(rawData);
 
-  "chartCursorSettings": {
-    "valueLineBalloonEnabled": true,
-    "valueLineEnabled": true
-  },
+    myChart.setOption(option = {
+        backgroundColor: '#fff',
+        animation: false,
+        legend: {
+            bottom: 10,
+            left: 'center',
+            data: ['Dow-Jones index', 'MA5', 'MA10', 'MA20', 'MA30']
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'cross'
+            },
+            backgroundColor: 'rgba(245, 245, 245, 0.8)',
+            borderWidth: 1,
+            borderColor: '#ccc',
+            padding: 10,
+            textStyle: {
+                color: '#000'
+            },
+            position: function (pos, params, el, elRect, size) {
+                var obj = { top: 10 };
+                obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+                return obj;
+            }
+            // extraCssText: 'width: 170px'
+        },
+        axisPointer: {
+            link: { xAxisIndex: 'all' },
+            label: {
+                backgroundColor: '#777'
+            }
+        },
+        toolbox: {
+            feature: {
+                dataZoom: {
+                    yAxisIndex: false
+                },
+                brush: {
+                    type: ['lineX', 'clear']
+                }
+            }
+        },
+        brush: {
+            xAxisIndex: 'all',
+            brushLink: 'all',
+            outOfBrush: {
+                colorAlpha: 0.1
+            }
+        },
+        visualMap: {
+            show: false,
+            seriesIndex: 5,
+            dimension: 2,
+            pieces: [{
+                value: 1,
+                color: downColor
+            }, {
+                value: -1,
+                color: upColor
+            }]
+        },
+        grid: [
+            {
+                left: '10%',
+                right: '8%',
+                height: '50%'
+            },
+            {
+                left: '10%',
+                right: '8%',
+                top: '63%',
+                height: '16%'
+            }
+        ],
+        xAxis: [
+            {
+                type: 'category',
+                data: data.categoryData,
+                scale: true,
+                boundaryGap: false,
+                axisLine: { onZero: false },
+                splitLine: { show: false },
+                splitNumber: 20,
+                min: 'dataMin',
+                max: 'dataMax',
+                axisPointer: {
+                    z: 100
+                }
+            },
+            {
+                type: 'category',
+                gridIndex: 1,
+                data: data.categoryData,
+                scale: true,
+                boundaryGap: false,
+                axisLine: { onZero: false },
+                axisTick: { show: false },
+                splitLine: { show: false },
+                axisLabel: { show: false },
+                splitNumber: 20,
+                min: 'dataMin',
+                max: 'dataMax'
+            }
+        ],
+        yAxis: [
+            {
+                scale: true,
+                splitArea: {
+                    show: true
+                }
+            },
+            {
+                scale: true,
+                gridIndex: 1,
+                splitNumber: 2,
+                axisLabel: { show: false },
+                axisLine: { show: false },
+                axisTick: { show: false },
+                splitLine: { show: false }
+            }
+        ],
+        dataZoom: [
+            {
+                type: 'inside',
+                xAxisIndex: [0, 1],
+                start: 98,
+                end: 100
+            },
+            {
+                show: true,
+                xAxisIndex: [0, 1],
+                type: 'slider',
+                top: '85%',
+                start: 98,
+                end: 100
+            }
+        ],
+        series: [
+            {
+                name: 'Dow-Jones index',
+                type: 'candlestick',
+                data: data.values,
+                itemStyle: {
+                    normal: {
+                        color: upColor,
+                        color0: downColor,
+                        borderColor: null,
+                        borderColor0: null
+                    }
+                },
+                tooltip: {
+                    formatter: function (param) {
+                        param = param[0];
+                        return [
+                            'Date: ' + param.name + '<hr size=1 style="margin: 3px 0">',
+                            'Open: ' + param.data[0] + '<br/>',
+                            'Close: ' + param.data[1] + '<br/>',
+                            'Lowest: ' + param.data[2] + '<br/>',
+                            'Highest: ' + param.data[3] + '<br/>'
+                        ].join('');
+                    }
+                }
+            },
+            {
+                name: 'MA5',
+                type: 'line',
+                data: calculateMA(5, data),
+                smooth: true,
+                lineStyle: {
+                    normal: { opacity: 0.5 }
+                }
+            },
+            {
+                name: 'MA10',
+                type: 'line',
+                data: calculateMA(10, data),
+                smooth: true,
+                lineStyle: {
+                    normal: { opacity: 0.5 }
+                }
+            },
+            {
+                name: 'MA20',
+                type: 'line',
+                data: calculateMA(20, data),
+                smooth: true,
+                lineStyle: {
+                    normal: { opacity: 0.5 }
+                }
+            },
+            {
+                name: 'MA30',
+                type: 'line',
+                data: calculateMA(30, data),
+                smooth: true,
+                lineStyle: {
+                    normal: { opacity: 0.5 }
+                }
+            },
+            {
+                name: 'Volume',
+                type: 'bar',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: data.volumes
+            }
+        ]
+    }, true);
 
-  "periodSelector": {
-    "position": "bottom",
-    "periods": [ {
-      "period": "DD",
-      "count": 10,
-      "label": "10 days"
-    }, {
-      "period": "MM",
-      "selected": true,
-      "count": 1,
-      "label": "1 month"
-    }, {
-      "period": "YYYY",
-      "count": 1,
-      "label": "1 year"
-    }, {
-      "period": "YTD",
-      "label": "YTD"
-    }, {
-      "period": "MAX",
-      "label": "MAX"
-    } ]
-  },
-  "export": {
-    "enabled": true
-  }
-} );
+    myChart.dispatchAction({
+        type: 'brush',
+        areas: [
+            {
+                brushType: 'lineX',
+                coordRange: ['2016-06-02', '2016-06-20'],
+                xAxisIndex: 0
+            }
+        ]
+    });
+});;
+if (option && typeof option === "object") {
+    myChart.setOption(option, true);
+}
